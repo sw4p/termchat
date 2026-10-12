@@ -1,0 +1,77 @@
+# GoReleaser config: `goreleaser release --snapshot --clean` builds everything
+# locally into dist/; pushing a v* tag makes .github/workflows/release.yml
+# publish it.
+version: 2
+
+project_name: termchat
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: termchat
+    main: ./cmd/termchat
+    binary: termchat
+    env:
+      - CGO_ENABLED=0 # fully static binaries: no libc, run anywhere
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: termchat
+    formats: [tar.gz]
+    # termchat_1.2.3_darwin_arm64.tar.gz — install.sh depends on this pattern.
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+nfpms:
+  - id: packages
+    package_name: termchat
+    homepage: https://github.com/sw4p/termchat
+    maintainer: sw4p <sw4p@users.noreply.github.com>
+    description: Chat with a random stranger on your local network, end-to-end encrypted, from the terminal.
+    formats: [deb, rpm]
+    bindir: /usr/bin
+
+homebrew_casks:
+  - name: termchat
+    repository:
+      owner: sw4p
+      name: homebrew-termchat
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: https://github.com/sw4p/termchat
+    description: Chat with a random stranger on your LAN, end-to-end encrypted, from the terminal
+    hooks:
+      post:
+        # The binaries aren't notarized by Apple, so clear the quarantine
+        # flag or Gatekeeper refuses to run a downloaded one.
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/termchat"]
+          end
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+# Releases are published to this repo, where install.sh and the Homebrew cask
+# download them.
+release:
+  github:
+    owner: sw4p
+    name: termchat
+  # Lets the one-line install use .../releases/latest/download/install.sh.
+  extra_files:
+    - glob: ./install.sh

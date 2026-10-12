@@ -1,6 +1,6 @@
 # termchat
 
-Chat with a random individual on your local network, from the terminal. Messages are limited to 160 characters.
+Chat with a random stranger on your local network, from the terminal.
 
 - **No server, no account.** termchat finds other people on the same Wi-Fi or LAN by itself.
 - **Anonymous.** You get a random nick like `quiet-otter`. Your hostname and real name are never sent.
@@ -30,44 +30,13 @@ brew install sw4p/termchat/termchat
 curl -fsSL https://github.com/sw4p/termchat/releases/latest/download/install.sh | sh
 ```
 
-To install a specific version or to a different directory, set `TERMCHAT_VERSION` (e.g. `0.1.0`) or `TERMCHAT_INSTALL_DIR`:
-
-```sh
-curl -fsSL https://github.com/sw4p/termchat/releases/latest/download/install.sh | TERMCHAT_INSTALL_DIR="$HOME/bin" sh
-```
-
-**Debian/Ubuntu:** download the `.deb` from the [releases page](https://github.com/sw4p/termchat/releases/latest), then:
+**Debian/Ubuntu:** download the `.deb` from the [releases page](https://github.com/sw4p/termchat/releases), then:
 
 ```sh
 sudo apt install ./termchat_*_amd64.deb
 ```
 
-**Fedora and other RPM-based systems:** download the `.rpm` from the releases page, then:
-
-```sh
-sudo dnf install ./termchat_*_amd64.rpm
-```
-
-**Manual download:** each release has a `.tar.gz` for every platform (`darwin` is macOS; `arm64` is Apple Silicon and ARM Linux, `amd64` is Intel/AMD). Download the archive and `checksums.txt`, then:
-
-```sh
-shasum -a 256 -c checksums.txt --ignore-missing   # or: sha256sum -c checksums.txt --ignore-missing
-tar -xzf termchat_*.tar.gz termchat
-sudo mv termchat /usr/local/bin/
-```
-
-Homebrew and the install script handle this for you.
-
-## Update and uninstall
-
-| Installed with | Update | Uninstall |
-|---|---|---|
-| Homebrew | `brew upgrade termchat` | `brew uninstall termchat` |
-| Install script | run the script again | `rm "$(command -v termchat)"` |
-| `.deb` | install the new `.deb` | `sudo apt remove termchat` |
-| `.rpm` | install the new `.rpm` | `sudo dnf remove termchat` |
-
-termchat stores no settings or history, so there's nothing else to clean up.
+For Fedora and other RPM-based systems, there's also a `.rpm` on the releases page.
 
 ## Use
 
@@ -93,6 +62,13 @@ termchat looks for other people running it on the same network and connects you 
 
 To send a message that starts with `/`, double it: `//shrug` sends `/shrug`.
 
+Messages are limited to 160 characters. Editing keys:
+- **Backspace** deletes the last character.
+- **Ctrl-W** deletes the last word.
+- **Ctrl-U** clears the line.
+
+You're never matched with the same person twice in one session.
+
 ### Manual mode
 
 If automatic discovery doesn't work on your network (some office and guest networks block it), connect directly:
@@ -102,14 +78,48 @@ termchat --listen :9000                  # on one machine
 termchat --connect 192.168.1.23:9000     # on the other
 ```
 
+## Firewalls and networks
+
+termchat uses **mDNS** (the protocol behind AirDrop, AirPlay and printer discovery) on **UDP port 5353** to find people, and **TCP** on a random port to chat.
+
+- **macOS:** the first time you run termchat, macOS may ask whether to allow incoming connections. Click **Allow**.
+- **Linux:** allow UDP 5353 and incoming TCP on your LAN. With `ufw`, run `sudo ufw allow 5353/udp`, and allow termchat's TCP port (or use manual mode with a fixed port).
+- **VPNs:** some VPNs block local-network traffic. If nobody shows up, try with the VPN off.
+- **Guest and office Wi-Fi** often isolates devices from each other. Discovery then finds nobody, and termchat prints a hint after a minute.
+
 ## Privacy and security
 
 **Nothing is stored.** No history, no logs and no files. When you quit, the chat is gone, except for whatever is still in your terminal's scrollback.
+
+**What others on your network can see:**
+- **Discovery:** anyone on the network can see that someone is running termchat. They see a random session id, your IP address and port, and whether you're available or busy. They never see your hostname or nick.
+- **Your nick:** it's only sent inside the encrypted connection, to the person you're matched with.
+
+**Encryption:** each connection starts with a fresh X25519 key exchange. Every message is then sealed with ChaCha20-Poly1305, using separate keys for each direction. Messages that are tampered with, replayed or reordered are detected, and the connection is dropped. Someone *passively* capturing Wi-Fi traffic sees only ciphertext.
+
+**What it doesn't protect against:** termchat is anonymous, so there's no way to verify *who* you're talking to. An attacker actively intercepting traffic on your local network (a man-in-the-middle) could sit between you and your partner and read the chat. Don't share anything you wouldn't say to a stranger in the same room, because that's who you're talking to.
+
+**Hostile peers:**
+- **Escape sequences:** termchat strips terminal escape sequences and control characters from everything it receives. A stranger can't clear your screen, change your window title, or write to your clipboard.
+- **Nothing runs:** termchat never runs, opens or saves anything it receives. It contains no code to do so.
+- **Size limits:** messages are capped at 160 characters and frames at 1 KB. Malformed input is dropped.
+- **Connection flooding:** connections must finish the handshake within 5 seconds, and only 4 unfinished connections are allowed at once.
 
 **Links:** strangers may send links or commands. termchat never asks you to run anything, so don't.
 
 **Install script:** it downloads over HTTPS and verifies the release's SHA-256 checksum before installing.
 
-## About this repository
+## Development
 
-This repository hosts termchat's releases: prebuilt binaries for macOS and Linux (amd64 and arm64), `.deb` and `.rpm` packages, `checksums.txt` and the install script.
+```sh
+go test -race ./...                        # all tests, with the race detector
+go run ./cmd/termchat                      # run it
+TERMCHAT_MDNS_TEST=1 go test ./internal/discovery   # includes a real mDNS round trip
+goreleaser release --snapshot --clean      # build release artifacts into dist/
+```
+
+Releases are built by GitHub Actions when a `v*` tag is pushed.
+
+## License
+
+termchat is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). See [CONTRIBUTING.md](CONTRIBUTING.md) before sending a pull request.

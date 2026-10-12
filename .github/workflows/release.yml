@@ -1,0 +1,37 @@
+name: Release
+
+# Push a tag like v1.2.0 to publish: GitHub release in sw4p/termchat
+# with archives, .deb/.rpm, checksums and install.sh, plus the Homebrew cask in
+# sw4p/homebrew-termchat.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read # releases go to other repos, using RELEASE_TOKEN
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # GoReleaser builds the changelog from history
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: test before releasing
+        run: go test -race ./...
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          # RELEASE_TOKEN can write to sw4p/termchat (the release) and
+          # sw4p/homebrew-termchat (the cask); the default GITHUB_TOKEN only
+          # reaches this repository.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
