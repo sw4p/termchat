@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -27,8 +28,9 @@ type Console struct {
 }
 
 // Open starts a Console on stdin/stdout. When both are terminals it switches
-// stdin to raw mode and runs the line editor. Otherwise (piped input, output
-// redirected to a file) it falls back to plain line-by-line I/O.
+// stdin to raw mode, clears the screen and runs the line editor. Otherwise
+// (piped input, output redirected to a file) it falls back to plain
+// line-by-line I/O.
 //
 // Always call Close, which restores the terminal.
 func Open(limit int) (*Console, error) {
@@ -40,6 +42,15 @@ func Open(limit int) (*Console, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Start on a clean screen with the cursor on the bottom row, so output
+	// grows upward from the prompt as in a chat window (and terminals that
+	// pin the running command over the top rows don't hide the greeting).
+	// Scrollback is left alone, so the user's earlier output isn't lost.
+	rows := 24
+	if _, h, err := term.GetSize(outFd); err == nil && h > 0 {
+		rows = h
+	}
+	fmt.Fprintf(os.Stdout, "\x1b[2J\x1b[%d;1H", rows)
 	width := func() int {
 		w, _, err := term.GetSize(outFd)
 		if err != nil || w <= 0 {
@@ -48,6 +59,10 @@ func Open(limit int) (*Console, error) {
 		return w
 	}
 	c := newRaw(os.Stdin, os.Stdout, width, limit)
+	c.screen.SetColor(os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb")
+	if ct := os.Getenv("COLORTERM"); ct == "truecolor" || ct == "24bit" {
+		UseTrueColor()
+	}
 	c.restore = func() { term.Restore(inFd, old) }
 	return c, nil
 }
@@ -147,12 +162,28 @@ func (c *Console) Interrupt() {
 // Println prints one line of output above the prompt.
 func (c *Console) Println(text string) { c.screen.Println(text) }
 
+// Message prints a chat message from name above the prompt. self is true for
+// the user's own messages.
+func (c *Console) Message(name string, self bool, text string) {
+	c.screen.Message(name, self, text)
+}
+
 // Bell rings the terminal bell. It does nothing in plain mode, where output
 // is probably going to a file or another program.
 func (c *Console) Bell() { c.screen.Bell() }
 
 // SetPrompt changes the prompt shown before the input line.
 func (c *Console) SetPrompt(p string) { c.screen.SetPrompt(p) }
+
+// SetStatus sets the hint shown after the empty prompt and the note on the
+// rule above it. See Screen.SetStatus.
+func (c *Console) SetStatus(hint, note string) { c.screen.SetStatus(hint, note) }
+
+// Hello prints the greeting, with nick in bold.
+func (c *Console) Hello(nick, text string) { c.screen.Hello(nick, text) }
+
+// Banner prints a rule with "text name" in the middle.
+func (c *Console) Banner(text, name string) { c.screen.Banner(text, name) }
 
 // Close erases the prompt and restores the terminal to how it was. It's safe
 // to call more than once.

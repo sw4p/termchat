@@ -87,11 +87,11 @@ func run() int {
 	switch {
 	case *listenAddr != "":
 		cfg.ListenAddr = *listenAddr
-		con.Println(fmt.Sprintf("hi, %s. waiting for someone to connect on %s (/help for commands)", name, *listenAddr))
+		con.Hello(name, fmt.Sprintf("hi, %s. waiting for someone to connect on %s (/help)", name, *listenAddr))
 	case *connectAddr != "":
 		cfg.Directory = session.StaticPeer(*connectAddr)
 		cfg.Verbose = true
-		con.Println(fmt.Sprintf("hi, %s. connecting to %s … (/help for commands)", name, *connectAddr))
+		con.Hello(name, fmt.Sprintf("hi, %s. connecting to %s … (/help)", name, *connectAddr))
 	default:
 		browser := discovery.NewBrowser(id)
 		go func() {
@@ -108,7 +108,7 @@ func run() int {
 			}
 			return adv, nil
 		}
-		con.Println(fmt.Sprintf("hi, %s. looking for someone on your network… (/help for commands)", name))
+		con.Hello(name, fmt.Sprintf("hi, %s. looking for someone… (/help)", name))
 	}
 
 	m := session.New(cfg)

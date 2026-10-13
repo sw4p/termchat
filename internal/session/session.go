@@ -60,7 +60,14 @@ func (s State) String() string {
 // Output is where the session prints. *ui.Console provides it.
 type Output interface {
 	Println(text string)
+	// Message prints a chat line from name; self is true for our own.
+	Message(name string, self bool, text string)
 	SetPrompt(p string)
+	// Banner prints a rule with "text name" set in it, for a new chat.
+	Banner(text, name string)
+	// SetStatus sets the dim hint after the empty prompt and a note on the
+	// rule above it (for example, that the partner is typing).
+	SetStatus(hint, note string)
 	Bell()
 }
 
@@ -286,27 +293,50 @@ func (m *Manager) setState(st State) {
 		m.adv.SetState(discovery.Busy)
 	}
 	m.out.SetPrompt(m.prompt())
+	m.out.SetStatus(m.hint())
 	select {
 	case m.wake <- struct{}{}:
 	default:
 	}
 }
 
-func (m *Manager) prompt() string {
+func (m *Manager) prompt() string { return "[" + m.status() + "] > " }
+
+// hint is what the prompt area shows besides the prompt: a dim hint for the
+// empty input line, and a note for the rule above it.
+func (m *Manager) hint() (hint, note string) {
 	switch m.state {
 	case Seeking:
-		return "[looking…] > "
+		return "looking for someone…", ""
 	case Chatting:
-		if m.current != nil && m.typing {
-			return fmt.Sprintf("[%s is typing…] > ", m.current.partner)
-		}
 		if m.current != nil {
-			return fmt.Sprintf("[chatting with %s] > ", m.current.partner)
+			if m.typing {
+				note = m.current.partner + " is typing…"
+			}
+			return "to " + m.current.partner, note
 		}
 	case Invisible:
-		return "[invisible] > "
+		return "invisible · /visible to come back", ""
 	}
-	return "[idle] > "
+	return "/find to look for someone", ""
+}
+
+// status says what the user is doing: looking, chatting, and so on.
+func (m *Manager) status() string {
+	switch m.state {
+	case Seeking:
+		return "looking…"
+	case Chatting:
+		if m.current != nil && m.typing {
+			return fmt.Sprintf("%s is typing…", m.current.partner)
+		}
+		if m.current != nil {
+			return fmt.Sprintf("chatting with %s", m.current.partner)
+		}
+	case Invisible:
+		return "invisible"
+	}
+	return "idle"
 }
 
 // begin starts a chat with partner over sc. m.mu must be held.
@@ -347,6 +377,7 @@ func (m *Manager) onTyping(c *conversation, on bool) {
 	}
 	m.typing = on
 	m.out.SetPrompt(m.prompt())
+	m.out.SetStatus(m.hint())
 }
 
 // Typing tells the partner we're typing. Call it on every keystroke: it
@@ -402,7 +433,7 @@ func (m *Manager) Send(text string) {
 	// If the send fails, the connection is broken and receive will end the
 	// chat, so there's nothing else to do here.
 	if c.send(protocol.Message{Type: protocol.TypeMsg, Text: text}) == nil {
-		m.out.Println("you: " + text)
+		m.out.Message("you", true, text)
 	}
 	// The partner's indicator clears when the message arrives, so the next
 	// keystroke should announce typing again straight away.

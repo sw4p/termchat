@@ -52,8 +52,8 @@ func newConversation(conn *crypto.SecureConn, partner string, out Output, tm Tim
 
 // start prints the new-chat banner and starts the background goroutines.
 func (c *conversation) start() {
-	c.printf("─── new chat with %s ───", c.partner)
-	c.printf("* Strangers may send links or commands. termchat never asks you to run anything.")
+	c.out.Banner("new chat with", c.partner)
+	c.printf("! strangers may send links or commands.\ntermchat never asks you to run anything.")
 	go c.receive()
 	go c.pinger()
 }
@@ -119,7 +119,7 @@ func (c *conversation) receive() {
 		switch m.Type {
 		case protocol.TypeMsg:
 			c.setTyping(false)
-			c.printf("%s: %s", c.partner, m.Text)
+			c.out.Message(c.partner, false, m.Text)
 			if c.bell {
 				c.out.Bell()
 			}
