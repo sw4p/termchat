@@ -30,6 +30,11 @@ type Screen struct {
 	input  []rune
 	closed bool
 	color  bool // style names and notices with ANSI colours
+
+	// status, when set and the terminal is wide enough, switches the prompt
+	// to the gutter form: a rule carrying the status, then "you › ".
+	status    string
+	ruleShown bool // a rule row is on screen directly above the prompt row
 }
 
 // NewScreen returns a Screen writing to out. width reports the terminal width
@@ -102,11 +107,69 @@ func (s *Screen) write(rows []string) {
 	// Raw mode has no automatic carriage return, so "\n" alone would only
 	// move down a line.
 	var b strings.Builder
+	if s.ruleShown {
+		b.WriteString("\r\x1b[1A") // up onto the rule, which the first row replaces
+	}
 	for _, r := range rows {
 		b.WriteString("\r\x1b[K" + r + "\r\n")
 	}
+	if s.ruleShown {
+		b.WriteString(s.rule() + "\r\n")
+	}
 	b.WriteString(s.render())
 	io.WriteString(s.out, b.String())
+}
+
+// SetStatus sets the text shown in the rule above the prompt, like
+// "chatting with quiet-otter". On a terminal too narrow for the gutter it
+// does nothing and the plain prompt stays.
+func (s *Screen) SetStatus(status string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.status = status
+	if s.plain || s.closed || !s.composer() {
+		return
+	}
+	if s.ruleShown {
+		io.WriteString(s.out, "\r\x1b[1A"+s.rule()+"\r\n"+s.render())
+		return
+	}
+	io.WriteString(s.out, "\r\x1b[K"+s.rule()+"\r\n"+s.render())
+	s.ruleShown = true
+}
+
+// composer reports whether the prompt is drawn in the gutter form.
+func (s *Screen) composer() bool {
+	return s.status != "" && s.width()-gutterLeft-1 >= minTextCols
+}
+
+// rule is the dim line above the prompt, with the status set into it.
+func (s *Screen) rule() string {
+	cols := s.width() - 1 // keep the last column free
+	label := "─── " + s.status + " "
+	fill := cols - stringWidth(label)
+	if fill < 0 {
+		label, fill = clip(label, cols), 0
+	}
+	line := label + strings.Repeat("─", fill)
+	if s.color {
+		return "\x1b[K" + paint(styleDim, line)
+	}
+	return "\x1b[K" + line
+}
+
+// head returns the prompt as drawn and the same without escape codes, for
+// measuring.
+func (s *Screen) head() (styled, plain string) {
+	if !s.composer() {
+		return s.prompt, s.prompt
+	}
+	plain = strings.Repeat(" ", gutterWidth-3) + "you › "
+	if !s.color {
+		return plain, plain
+	}
+	pad := strings.Repeat(" ", gutterWidth-3)
+	return pad + paint(styleYou+styleBold, "you") + " " + paint(styleYou, "›") + " ", plain
 }
 
 // Bell rings the terminal bell (BEL, "\a"). Plain mode stays silent.
@@ -141,6 +204,9 @@ func (s *Screen) Close() {
 	defer s.mu.Unlock()
 	if !s.plain && !s.closed {
 		io.WriteString(s.out, "\r\x1b[K")
+		if s.ruleShown {
+			io.WriteString(s.out, "\x1b[1A\r\x1b[K") // and the rule above it
+		}
 	}
 	s.closed = true
 }
@@ -156,11 +222,12 @@ func (s *Screen) redraw() {
 // that wrapped would leave its first half behind on every redraw. When the
 // input is too wide, only its tail is shown, after an ellipsis.
 func (s *Screen) render() string {
-	head := s.prompt
+	head, plain := s.head()
 	if n := len(s.input); s.limit > 0 && n >= s.limit-counterMargin {
-		head = fmt.Sprintf("%s(%d/%d) ", head, n, s.limit)
+		counter := fmt.Sprintf("(%d/%d) ", n, s.limit)
+		head, plain = head+counter, plain+counter
 	}
-	avail := s.width() - stringWidth(head) - 1 // keep the last column free
+	avail := s.width() - stringWidth(plain) - 1 // keep the last column free
 	shown := s.input
 	if avail < 1 {
 		shown = nil

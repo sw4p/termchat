@@ -78,3 +78,46 @@ func TestScreenNoticeAndColor(t *testing.T) {
 		t.Errorf("warning not styled: %q", got)
 	}
 }
+
+func TestScreenStatusRuleAndGutterPrompt(t *testing.T) {
+	s, buf := newTestScreen(40, 160)
+	s.SetPrompt("[x] > ")
+	buf.Reset()
+
+	s.SetStatus("idle")
+	want := "\r\x1b[K\x1b[K─── idle " + strings.Repeat("─", 39-9) + "\r\n" + "\r\x1b[K" + "           you › "
+	if got := buf.String(); got != want {
+		t.Errorf("first SetStatus wrote %q\nwant %q", got, want)
+	}
+
+	// Later output replaces the rule: up a row, print, then rule and prompt.
+	buf.Reset()
+	s.Message("bob", false, "hi")
+	if got := buf.String(); !strings.HasPrefix(got, "\r\x1b[1A\r\x1b[K") || !strings.Contains(got, "─── idle ") || !strings.HasSuffix(got, "you › ") {
+		t.Errorf("Message with a rule wrote %q", got)
+	}
+
+	// A status change rewrites the rule in place.
+	buf.Reset()
+	s.SetStatus("chatting with bob")
+	if got := buf.String(); !strings.HasPrefix(got, "\r\x1b[1A") || !strings.Contains(got, "─── chatting with bob ") {
+		t.Errorf("status change wrote %q", got)
+	}
+
+	// Close clears the prompt row and the rule.
+	buf.Reset()
+	s.Close()
+	if got, want := buf.String(), "\r\x1b[K\x1b[1A\r\x1b[K"; got != want {
+		t.Errorf("Close wrote %q, want %q", got, want)
+	}
+}
+
+func TestScreenStatusNarrowKeepsPlainPrompt(t *testing.T) {
+	s, buf := newTestScreen(20, 160)
+	s.SetPrompt("[idle] > ")
+	buf.Reset()
+	s.SetStatus("idle")
+	if buf.Len() != 0 || s.visibleText() != "[idle] > " {
+		t.Errorf("narrow screen drew %q, prompt %q", buf.String(), s.visibleText())
+	}
+}

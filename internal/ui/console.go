@@ -161,6 +161,9 @@ func (c *Console) Bell() { c.screen.Bell() }
 // SetPrompt changes the prompt shown before the input line.
 func (c *Console) SetPrompt(p string) { c.screen.SetPrompt(p) }
 
+// SetStatus changes the status shown in the rule above the prompt.
+func (c *Console) SetStatus(status string) { c.screen.SetStatus(status) }
+
 // Close erases the prompt and restores the terminal to how it was. It's safe
 // to call more than once.
 func (c *Console) Close() {
