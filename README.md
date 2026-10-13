@@ -10,7 +10,7 @@ Chat with a random stranger on your local network, from the terminal.
 ```
 hi, quiet-otter. looking for someone on your network… (/help for commands)
 ─── new chat with brave-lynx ───
-* Strangers may send links or commands. termchat never asks you to run anything.
+! Strangers may send links or commands. termchat never asks you to run anything.
 brave-lynx: hey! anyone else stuck in this meeting?
 you: haha yes
 [brave-lynx is typing…] >

@@ -60,6 +60,8 @@ func (s State) String() string {
 // Output is where the session prints. *ui.Console provides it.
 type Output interface {
 	Println(text string)
+	// Message prints a chat line from name; self is true for our own.
+	Message(name string, self bool, text string)
 	SetPrompt(p string)
 	Bell()
 }
@@ -402,7 +404,7 @@ func (m *Manager) Send(text string) {
 	// If the send fails, the connection is broken and receive will end the
 	// chat, so there's nothing else to do here.
 	if c.send(protocol.Message{Type: protocol.TypeMsg, Text: text}) == nil {
-		m.out.Println("you: " + text)
+		m.out.Message("you", true, text)
 	}
 	// The partner's indicator clears when the message arrives, so the next
 	// keystroke should announce typing again straight away.

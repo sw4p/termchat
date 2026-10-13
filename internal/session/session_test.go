@@ -140,6 +140,11 @@ func (o *testOut) Println(s string) {
 	o.lines = append(o.lines, s)
 }
 
+// Message records chat lines in the plain "name: text" form.
+func (o *testOut) Message(name string, self bool, text string) {
+	o.Println(name + ": " + text)
+}
+
 func (o *testOut) SetPrompt(p string) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
