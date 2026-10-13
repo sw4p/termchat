@@ -17,7 +17,7 @@ const (
 )
 
 // ANSI styles. Only used when colour is on. The colours are the design's
-// (peer blue #5fb3e6, you orange #e8a45c, warning #e5c07b, dim #8b93a1,
+// (peer blue #5fb3e6, you orange #e8a45c, warning red #e06c75, dim #8b93a1,
 // rules #2a2f38), as the nearest 256-colour entries, or exact RGB where the
 // terminal supports it.
 var (
@@ -28,14 +28,14 @@ var (
 	styleItal  = "\x1b[3m"
 	stylePeer  = "\x1b[38;5;74m"
 	styleYou   = "\x1b[38;5;215m"
-	styleWarn  = "\x1b[38;5;180m"
+	styleWarn  = "\x1b[38;5;168m"
 )
 
 // UseTrueColor switches the palette to the design's exact RGB values.
 func UseTrueColor() {
 	stylePeer = "\x1b[38;2;95;179;230m"
 	styleYou = "\x1b[38;2;232;164;92m"
-	styleWarn = "\x1b[38;2;229;192;123m"
+	styleWarn = "\x1b[38;2;224;108;117m"
 	styleDim = "\x1b[38;2;139;147;161m"
 	styleRule = "\x1b[38;2;42;47;56m"
 }
