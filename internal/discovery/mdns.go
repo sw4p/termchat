@@ -39,6 +39,20 @@ func multicastIfaces() []net.Interface {
 	return out
 }
 
+// sendToGroup sends b to the mDNS group once on each multicast interface and
+// reports how many sends succeeded.
+func sendToGroup(conn *ipv4.PacketConn, b []byte) (sent int) {
+	for _, iface := range multicastIfaces() {
+		if conn.SetMulticastInterface(&iface) != nil {
+			continue
+		}
+		if _, err := conn.WriteTo(b, nil, mdnsGroup); err == nil {
+			sent++
+		}
+	}
+	return sent
+}
+
 // ─── Advertiser: answers questions about us ─────────────────────────────────
 
 // Advertiser announces this instance on the network by answering mDNS
@@ -115,13 +129,14 @@ func (a *Advertiser) serve() {
 			continue
 		}
 		// A regular mDNS query (e.g. `dns-sd -B _termchat._tcp`): answer to
-		// the group, on the interface it came in on.
+		// the group, on the interface it came in on. Windows doesn't report
+		// that (cm is nil), so there we answer on every interface.
 		if b, err := a.response(&q, false).Pack(); err == nil {
-			var wcm *ipv4.ControlMessage
 			if cm != nil {
-				wcm = &ipv4.ControlMessage{IfIndex: cm.IfIndex}
+				a.conn.WriteTo(b, &ipv4.ControlMessage{IfIndex: cm.IfIndex}, mdnsGroup)
+			} else {
+				sendToGroup(a.conn, b)
 			}
-			a.conn.WriteTo(b, wcm, mdnsGroup)
 		}
 	}
 }
@@ -193,16 +208,7 @@ func mdnsRound(ctx context.Context) ([]Peer, error) {
 	if err != nil {
 		return nil, err
 	}
-	sent := 0
-	for _, iface := range multicastIfaces() {
-		if conn.SetMulticastInterface(&iface) != nil {
-			continue
-		}
-		if _, err := conn.WriteTo(b, nil, mdnsGroup); err == nil {
-			sent++
-		}
-	}
-	if sent == 0 {
+	if sendToGroup(conn, b) == 0 {
 		return nil, errors.New("discovery: couldn't send an mDNS query on any interface")
 	}
 
