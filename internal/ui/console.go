@@ -38,8 +38,15 @@ func Open(limit int) (*Console, error) {
 	if !term.IsTerminal(inFd) || !term.IsTerminal(outFd) {
 		return NewPlain(os.Stdin, os.Stdout), nil
 	}
+	// Windows consoles need escape codes switched on. Where that's impossible
+	// (pre-1511 conhost) they'd print as junk, so plain lines are better.
+	restoreOut, err := enableVT(outFd)
+	if err != nil {
+		return NewPlain(os.Stdin, os.Stdout), nil
+	}
 	old, err := term.MakeRaw(inFd)
 	if err != nil {
+		restoreOut()
 		return nil, err
 	}
 	// Start on a clean screen with the cursor on the bottom row, so output
@@ -63,7 +70,10 @@ func Open(limit int) (*Console, error) {
 	if ct := os.Getenv("COLORTERM"); ct == "truecolor" || ct == "24bit" {
 		UseTrueColor()
 	}
-	c.restore = func() { term.Restore(inFd, old) }
+	c.restore = func() {
+		term.Restore(inFd, old)
+		restoreOut()
+	}
 	return c, nil
 }
 

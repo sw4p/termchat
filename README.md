@@ -40,6 +40,20 @@ sudo apt install ./termchat_*_amd64.deb
 
 For Fedora and other RPM-based systems, there's also a `.rpm` on the releases page.
 
+**Windows (PowerShell):** the script downloads the latest release, checks its SHA-256 checksum, installs `termchat.exe` to `%LOCALAPPDATA%\Programs\termchat`, and adds that folder to your user PATH. It doesn't need admin rights. Open a new terminal afterwards, then run `termchat` from cmd.exe or PowerShell.
+
+```powershell
+irm https://github.com/sw4p/termchat/releases/latest/download/install.ps1 | iex
+```
+
+To install by hand instead, download `termchat_*_windows_amd64.zip` (or `_arm64`) from the [releases page](https://github.com/sw4p/termchat/releases), unzip it, and run `termchat.exe`.
+
+Notes for Windows:
+
+- The first time termchat runs, Windows Defender Firewall asks whether to allow it on the network. Allow it on **Private networks**, or termchat can't find anyone.
+- The binary isn't code-signed, so SmartScreen may warn about a downloaded copy. Choose **More info → Run anyway**. The install script clears this mark for you.
+- termchat needs Windows 10 version 1607 or later, or Windows 11. On older consoles it falls back to plain line-by-line mode.
+
 ## Use
 
 ```sh

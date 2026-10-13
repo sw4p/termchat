@@ -1,0 +1,3 @@
+# Keep LF everywhere, including Windows checkouts: gofmt rejects CRLF and
+# install.sh must run under sh.
+* text=auto eol=lf
