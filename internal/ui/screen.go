@@ -31,9 +31,12 @@ type Screen struct {
 	closed bool
 	color  bool // style names and notices with ANSI colours
 
-	// status, when set and the terminal is wide enough, switches the prompt
-	// to the gutter form: a rule carrying the status, then "you › ".
-	status    string
+	// Once SetStatus has been called and the terminal is wide enough, the
+	// prompt takes the gutter form: a rule, then "you › " with hint dimmed
+	// after the cursor while the input is empty. note rides on the rule.
+	statusSet bool
+	hint      string
+	note      string
 	ruleShown bool // a rule row is on screen directly above the prompt row
 }
 
@@ -66,14 +69,14 @@ func (s *Screen) Println(text string) {
 	if cols := s.width(); cols-gutterLeft-1 >= minTextCols {
 		switch {
 		case strings.HasPrefix(text, "* "):
-			s.write(gutterLines("·", styleDim, styleDim, styleDim, text[2:], cols, s.color))
+			s.write(gutterLines("·", styleDim, styleDim, styleDim+styleItal, text[2:], "", cols, s.color))
 			return
 		case strings.HasPrefix(text, "! "):
-			s.write(gutterLines("!", styleWarn+styleBold, styleDim, styleWarn, text[2:], cols, s.color))
+			s.write(gutterLines("!", styleWarn, styleDim, styleWarn+styleItal, text[2:], "", cols, s.color))
 			return
 		}
 	}
-	s.write([]string{text})
+	s.write([]string{strings.ReplaceAll(text, "\n", " ")})
 }
 
 // Message prints a chat line: name, then text, in the gutter. self marks our
@@ -98,7 +101,57 @@ func (s *Screen) Message(name string, self bool, text string) {
 	if self {
 		style = styleYou + styleBold
 	}
-	s.write(gutterLines(name, style, styleDim, "", text, cols, s.color))
+	s.write(gutterLines(name, style, styleDim, "", text, "", cols, s.color))
+}
+
+// Hello prints the greeting: a dim "termchat" in the name column, then text,
+// with nick (which should occur in text) in bold.
+func (s *Screen) Hello(nick, text string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	if s.plain || s.width()-gutterLeft-1 < minTextCols {
+		s.printPlainLocked(text)
+		return
+	}
+	s.write(gutterLines("termchat", styleDim, styleDim, styleDim, text, nick, s.width(), s.color))
+}
+
+// Banner prints a rule with "text name" set in the middle, name in bold and
+// the label in the partner's colour.
+func (s *Screen) Banner(text, name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	label := text + " " + name
+	total := s.width() - 1
+	if s.plain || total < stringWidth(label)+8 {
+		s.printPlainLocked("─── " + label + " ───")
+		return
+	}
+	left := (total - stringWidth(label) - 2) / 2
+	right := total - stringWidth(label) - 2 - left
+	row := strings.Repeat("─", left) + " " + label + " " + strings.Repeat("─", right)
+	if s.color {
+		row = paint(styleDim, strings.Repeat("─", left)) + " " +
+			paint(stylePeer, text+" ") + paint(stylePeer+styleBold, name) + " " +
+			paint(styleDim, strings.Repeat("─", right))
+	}
+	s.write([]string{row})
+}
+
+// printPlainLocked prints one unstyled line the way Println does. s.mu must
+// be held.
+func (s *Screen) printPlainLocked(text string) {
+	if s.plain {
+		fmt.Fprintln(s.out, text)
+		return
+	}
+	s.write([]string{text})
 }
 
 // write prints each row above the prompt, then redraws the prompt. s.mu must
@@ -120,13 +173,14 @@ func (s *Screen) write(rows []string) {
 	io.WriteString(s.out, b.String())
 }
 
-// SetStatus sets the text shown in the rule above the prompt, like
-// "chatting with quiet-otter". On a terminal too narrow for the gutter it
-// does nothing and the plain prompt stays.
-func (s *Screen) SetStatus(status string) {
+// SetStatus sets the gutter-form prompt's extras: hint is dim placeholder text
+// after the cursor while the input is empty, and note is dim text at the
+// right end of the rule above the prompt. On a terminal too narrow for the
+// gutter it does nothing and the plain prompt stays.
+func (s *Screen) SetStatus(hint, note string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.status = status
+	s.statusSet, s.hint, s.note = true, hint, note
 	if s.plain || s.closed || !s.composer() {
 		return
 	}
@@ -140,20 +194,21 @@ func (s *Screen) SetStatus(status string) {
 
 // composer reports whether the prompt is drawn in the gutter form.
 func (s *Screen) composer() bool {
-	return s.status != "" && s.width()-gutterLeft-1 >= minTextCols
+	return s.statusSet && s.width()-gutterLeft-1 >= minTextCols
 }
 
-// rule is the dim line above the prompt, with the status set into it.
+// rule is the dim line above the prompt, with the note at its right end.
 func (s *Screen) rule() string {
 	cols := s.width() - 1 // keep the last column free
-	label := "─── " + s.status + " "
-	fill := cols - stringWidth(label)
-	if fill < 0 {
-		label, fill = clip(label, cols), 0
+	line := strings.Repeat("─", cols)
+	if s.note != "" {
+		tail := " " + s.note + " ──"
+		if w := stringWidth(tail); w < cols-4 {
+			line = strings.Repeat("─", cols-w) + tail
+		}
 	}
-	line := label + strings.Repeat("─", fill)
 	if s.color {
-		return "\x1b[K" + paint(styleDim, line)
+		line = paint(styleDim, line)
 	}
 	return "\x1b[K" + line
 }
@@ -164,11 +219,11 @@ func (s *Screen) head() (styled, plain string) {
 	if !s.composer() {
 		return s.prompt, s.prompt
 	}
-	plain = strings.Repeat(" ", gutterWidth-3) + "you › "
+	pad := strings.Repeat(" ", gutterWidth-3)
+	plain = pad + "you › "
 	if !s.color {
 		return plain, plain
 	}
-	pad := strings.Repeat(" ", gutterWidth-3)
 	return pad + paint(styleYou+styleBold, "you") + " " + paint(styleYou, "›") + " ", plain
 }
 
@@ -239,7 +294,30 @@ func (s *Screen) render() string {
 		}
 		shown = append([]rune{'…'}, shown[i:]...)
 	}
+	if len(shown) == 0 && s.composer() && s.hint != "" && avail > 1 {
+		hint := clipEnd(s.hint, avail)
+		h := hint
+		if s.color {
+			h = paint(styleDim, hint)
+		}
+		// Park the cursor back at the start of the (empty) input.
+		return fmt.Sprintf("\r\x1b[K%s%s\x1b[%dD", head, h, stringWidth(hint))
+	}
 	return "\r\x1b[K" + head + string(shown)
+}
+
+// clipEnd shortens s to at most w columns, ending with "…" if it was cut.
+func clipEnd(s string, w int) string {
+	if stringWidth(s) <= w {
+		return s
+	}
+	rs := []rune(s)
+	cut, i := 1, 0
+	for i < len(rs) && cut+runeWidth(rs[i]) <= w {
+		cut += runeWidth(rs[i])
+		i++
+	}
+	return string(rs[:i]) + "…"
 }
 
 func stringWidth(s string) int { return runesWidth([]rune(s)) }

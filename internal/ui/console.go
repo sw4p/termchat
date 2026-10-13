@@ -161,8 +161,15 @@ func (c *Console) Bell() { c.screen.Bell() }
 // SetPrompt changes the prompt shown before the input line.
 func (c *Console) SetPrompt(p string) { c.screen.SetPrompt(p) }
 
-// SetStatus changes the status shown in the rule above the prompt.
-func (c *Console) SetStatus(status string) { c.screen.SetStatus(status) }
+// SetStatus sets the hint shown after the empty prompt and the note on the
+// rule above it. See Screen.SetStatus.
+func (c *Console) SetStatus(hint, note string) { c.screen.SetStatus(hint, note) }
+
+// Hello prints the greeting, with nick in bold.
+func (c *Console) Hello(nick, text string) { c.screen.Hello(nick, text) }
+
+// Banner prints a rule with "text name" in the middle.
+func (c *Console) Banner(text, name string) { c.screen.Banner(text, name) }
 
 // Close erases the prompt and restores the terminal to how it was. It's safe
 // to call more than once.

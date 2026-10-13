@@ -74,7 +74,7 @@ func TestScreenNoticeAndColor(t *testing.T) {
 	s.SetColor(true)
 	s.Println("! careful")
 	got := buf.String()
-	if !strings.Contains(got, styleWarn+styleBold+"!"+styleReset) || !strings.Contains(got, "careful") {
+	if !strings.Contains(got, styleWarn+"!"+styleReset) || !strings.Contains(got, "careful") {
 		t.Errorf("warning not styled: %q", got)
 	}
 }
@@ -84,8 +84,9 @@ func TestScreenStatusRuleAndGutterPrompt(t *testing.T) {
 	s.SetPrompt("[x] > ")
 	buf.Reset()
 
-	s.SetStatus("idle")
-	want := "\r\x1b[K\x1b[K─── idle " + strings.Repeat("─", 39-9) + "\r\n" + "\r\x1b[K" + "           you › "
+	s.SetStatus("to bob", "")
+	rule := strings.Repeat("─", 39)
+	want := "\r\x1b[K\x1b[K" + rule + "\r\n" + "\r\x1b[K" + "           you › to bob\x1b[6D"
 	if got := buf.String(); got != want {
 		t.Errorf("first SetStatus wrote %q\nwant %q", got, want)
 	}
@@ -93,15 +94,21 @@ func TestScreenStatusRuleAndGutterPrompt(t *testing.T) {
 	// Later output replaces the rule: up a row, print, then rule and prompt.
 	buf.Reset()
 	s.Message("bob", false, "hi")
-	if got := buf.String(); !strings.HasPrefix(got, "\r\x1b[1A\r\x1b[K") || !strings.Contains(got, "─── idle ") || !strings.HasSuffix(got, "you › ") {
+	if got := buf.String(); !strings.HasPrefix(got, "\r\x1b[1A\r\x1b[K") || !strings.Contains(got, rule) || !strings.Contains(got, "you › to bob") {
 		t.Errorf("Message with a rule wrote %q", got)
 	}
 
-	// A status change rewrites the rule in place.
+	// A note rides on the right end of the rule, rewritten in place.
 	buf.Reset()
-	s.SetStatus("chatting with bob")
-	if got := buf.String(); !strings.HasPrefix(got, "\r\x1b[1A") || !strings.Contains(got, "─── chatting with bob ") {
-		t.Errorf("status change wrote %q", got)
+	s.SetStatus("to bob", "bob is typing…")
+	if got := buf.String(); !strings.HasPrefix(got, "\r\x1b[1A") || !strings.Contains(got, "─ bob is typing… ──") {
+		t.Errorf("note change wrote %q", got)
+	}
+
+	// Typing hides the hint.
+	s.SetInput("yo")
+	if got := s.visibleText(); got != "           you › yo" {
+		t.Errorf("prompt with input = %q", got)
 	}
 
 	// Close clears the prompt row and the rule.
@@ -116,8 +123,38 @@ func TestScreenStatusNarrowKeepsPlainPrompt(t *testing.T) {
 	s, buf := newTestScreen(20, 160)
 	s.SetPrompt("[idle] > ")
 	buf.Reset()
-	s.SetStatus("idle")
+	s.SetStatus("to bob", "")
 	if buf.Len() != 0 || s.visibleText() != "[idle] > " {
 		t.Errorf("narrow screen drew %q, prompt %q", buf.String(), s.visibleText())
+	}
+}
+
+func TestScreenWarningRows(t *testing.T) {
+	s, buf := newTestScreen(60, 160)
+	s.Println("! strangers may send links.\ntermchat never asks you to run anything.")
+	want := "\r\x1b[K" + strings.Repeat(" ", 13) + "! │ strangers may send links.\r\n" +
+		"\r\x1b[K" + strings.Repeat(" ", 14) + " │ termchat never asks you to run anything.\r\n"
+	if got := buf.String(); !strings.HasPrefix(got, want) {
+		t.Errorf("warning wrote %q\nwant prefix %q", got, want)
+	}
+}
+
+func TestScreenBannerAndHello(t *testing.T) {
+	s, buf := newTestScreen(40, 160)
+	s.Banner("new chat with", "bob")
+	got := buf.String()
+	if !strings.Contains(got, " new chat with bob ") || strings.Count(got, "─") != 39-len(" new chat with bob ") {
+		t.Errorf("banner = %q", got)
+	}
+	buf.Reset()
+	s.Hello("nimble", "hi, nimble. hello")
+	if got := buf.String(); !strings.Contains(got, "      termchat │ hi, nimble. hello") {
+		t.Errorf("hello = %q", got)
+	}
+	buf.Reset()
+	s.SetColor(true)
+	s.Hello("nimble", "hi, nimble. hello")
+	if got := buf.String(); !strings.Contains(got, styleBold+"nimble"+styleReset) {
+		t.Errorf("nick not bold: %q", got)
 	}
 }

@@ -24,13 +24,19 @@ const (
 	stylePeer  = "\x1b[36m" // cyan
 	styleYou   = "\x1b[33m" // yellow
 	styleWarn  = "\x1b[33m"
+	styleItal  = "\x1b[3m"
 )
 
-// gutterLines lays out one row per wrapped piece of text. name is clipped to
-// the gutter; nameStyle and sepStyle are ANSI prefixes ("" for none). Empty
-// name draws a blank gutter. cols is the terminal width.
-func gutterLines(name, nameStyle, sepStyle, textStyle, text string, cols int, color bool) []string {
-	pieces := wrap(text, cols-gutterLeft-1)
+// gutterLines lays out one row per wrapped piece of text; "\n" in text starts
+// a new wrapped paragraph. name is clipped to the gutter and shown on the
+// first row only; later rows get a blank gutter. nameStyle, sepStyle and
+// textStyle are ANSI prefixes ("" for none). highlight, if it occurs in the
+// text, is drawn bold. cols is the terminal width.
+func gutterLines(name, nameStyle, sepStyle, textStyle, text, highlight string, cols int, color bool) []string {
+	var pieces []string
+	for _, para := range strings.Split(text, "\n") {
+		pieces = append(pieces, wrap(para, cols-gutterLeft-1)...)
+	}
 	out := make([]string, len(pieces))
 	for i, p := range pieces {
 		n := ""
@@ -39,6 +45,9 @@ func gutterLines(name, nameStyle, sepStyle, textStyle, text string, cols int, co
 		}
 		pad := strings.Repeat(" ", gutterWidth-stringWidth(n))
 		if color {
+			if highlight != "" && strings.Contains(p, highlight) {
+				p = strings.Replace(p, highlight, styleReset+styleBold+highlight+styleReset+textStyle, 1)
+			}
 			out[i] = pad + paint(nameStyle, n) + paint(sepStyle, gutterSep) + paint(textStyle, p)
 		} else {
 			out[i] = pad + n + gutterSep + p
