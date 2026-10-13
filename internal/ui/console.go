@@ -48,6 +48,7 @@ func Open(limit int) (*Console, error) {
 		return w
 	}
 	c := newRaw(os.Stdin, os.Stdout, width, limit)
+	c.screen.SetColor(os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb")
 	c.restore = func() { term.Restore(inFd, old) }
 	return c, nil
 }
@@ -146,6 +147,12 @@ func (c *Console) Interrupt() {
 
 // Println prints one line of output above the prompt.
 func (c *Console) Println(text string) { c.screen.Println(text) }
+
+// Message prints a chat message from name above the prompt. self is true for
+// the user's own messages.
+func (c *Console) Message(name string, self bool, text string) {
+	c.screen.Message(name, self, text)
+}
 
 // Bell rings the terminal bell. It does nothing in plain mode, where output
 // is probably going to a file or another program.

@@ -29,6 +29,7 @@ type Screen struct {
 	prompt string
 	input  []rune
 	closed bool
+	color  bool // style names and notices with ANSI colours
 }
 
 // NewScreen returns a Screen writing to out. width reports the terminal width
@@ -37,7 +38,16 @@ func NewScreen(out io.Writer, plain bool, width func() int, limit int) *Screen {
 	return &Screen{out: out, plain: plain, width: width, limit: limit}
 }
 
-// Println prints text above the prompt. text is a single line.
+// SetColor turns ANSI colours on or off for names and notices.
+func (s *Screen) SetColor(on bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.color = on
+}
+
+// Println prints text above the prompt. text is a single line. Lines that
+// start with "* " (notices) or "! " (warnings) go in the gutter's name
+// column as "·" and "!"; anything else is printed as is.
 func (s *Screen) Println(text string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -48,9 +58,55 @@ func (s *Screen) Println(text string) {
 		fmt.Fprintln(s.out, text)
 		return
 	}
+	if cols := s.width(); cols-gutterLeft-1 >= minTextCols {
+		switch {
+		case strings.HasPrefix(text, "* "):
+			s.write(gutterLines("·", styleDim, styleDim, styleDim, text[2:], cols, s.color))
+			return
+		case strings.HasPrefix(text, "! "):
+			s.write(gutterLines("!", styleWarn+styleBold, styleDim, styleWarn, text[2:], cols, s.color))
+			return
+		}
+	}
+	s.write([]string{text})
+}
+
+// Message prints a chat line: name, then text, in the gutter. self marks our
+// own messages, which get a different colour from the partner's. Plain mode
+// prints "name: text".
+func (s *Screen) Message(name string, self bool, text string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	if s.plain {
+		fmt.Fprintln(s.out, name+": "+text)
+		return
+	}
+	cols := s.width()
+	if cols-gutterLeft-1 < minTextCols { // too narrow for a gutter
+		s.write([]string{name + ": " + text})
+		return
+	}
+	style := stylePeer + styleBold
+	if self {
+		style = styleYou + styleBold
+	}
+	s.write(gutterLines(name, style, styleDim, "", text, cols, s.color))
+}
+
+// write prints each row above the prompt, then redraws the prompt. s.mu must
+// be held.
+func (s *Screen) write(rows []string) {
 	// Raw mode has no automatic carriage return, so "\n" alone would only
 	// move down a line.
-	io.WriteString(s.out, "\r\x1b[K"+text+"\r\n"+s.render())
+	var b strings.Builder
+	for _, r := range rows {
+		b.WriteString("\r\x1b[K" + r + "\r\n")
+	}
+	b.WriteString(s.render())
+	io.WriteString(s.out, b.String())
 }
 
 // Bell rings the terminal bell (BEL, "\a"). Plain mode stays silent.
