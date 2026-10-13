@@ -108,7 +108,7 @@ func run() int {
 			}
 			return adv, nil
 		}
-		con.Hello(name, fmt.Sprintf("hi, %s. looking for someone on your network… (/help)", name))
+		con.Hello(name, fmt.Sprintf("hi, %s. looking for someone… (/help)", name))
 	}
 
 	m := session.New(cfg)
