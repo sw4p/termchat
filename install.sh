@@ -29,7 +29,8 @@ need uname
 case "$(uname -s)" in
   Darwin) os=darwin ;;
   Linux) os=linux ;;
-  *) die "unsupported OS $(uname -s); termchat runs on macOS and Linux" ;;
+  MINGW* | MSYS* | CYGWIN*) die "on Windows, install from PowerShell instead: irm https://github.com/$REPO/releases/latest/download/install.ps1 | iex" ;;
+  *) die "unsupported OS $(uname -s); termchat runs on macOS, Linux and Windows (Windows: use install.ps1)" ;;
 esac
 
 case "$(uname -m)" in

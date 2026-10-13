@@ -15,7 +15,7 @@ builds:
     binary: termchat
     env:
       - CGO_ENABLED=0 # fully static binaries: no libc, run anywhere
-    goos: [darwin, linux]
+    goos: [darwin, linux, windows]
     goarch: [amd64, arm64]
     flags: [-trimpath]
     ldflags:
@@ -24,8 +24,12 @@ builds:
 archives:
   - id: termchat
     formats: [tar.gz]
-    # termchat_1.2.3_darwin_arm64.tar.gz — install.sh depends on this pattern.
+    # termchat_1.2.3_darwin_arm64.tar.gz (or termchat_1.2.3_windows_amd64.zip)
+    # — install.sh and install.ps1 depend on this pattern.
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     files:
       - README.md
 
@@ -72,6 +76,8 @@ release:
   github:
     owner: sw4p
     name: termchat
-  # Lets the one-line install use .../releases/latest/download/install.sh.
+  # Lets the one-line installs use .../releases/latest/download/install.sh
+  # (or install.ps1).
   extra_files:
     - glob: ./install.sh
+    - glob: ./install.ps1
