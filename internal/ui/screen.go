@@ -137,9 +137,9 @@ func (s *Screen) Banner(text, name string) {
 	right := total - stringWidth(label) - 2 - left
 	row := strings.Repeat("─", left) + " " + label + " " + strings.Repeat("─", right)
 	if s.color {
-		row = paint(styleDim, strings.Repeat("─", left)) + " " +
+		row = paint(styleRule, strings.Repeat("─", left)) + " " +
 			paint(stylePeer, text+" ") + paint(stylePeer+styleBold, name) + " " +
-			paint(styleDim, strings.Repeat("─", right))
+			paint(styleRule, strings.Repeat("─", right))
 	}
 	s.write([]string{row})
 }
@@ -201,14 +201,18 @@ func (s *Screen) composer() bool {
 func (s *Screen) rule() string {
 	cols := s.width() - 1 // keep the last column free
 	line := strings.Repeat("─", cols)
-	if s.note != "" {
-		tail := " " + s.note + " ──"
-		if w := stringWidth(tail); w < cols-4 {
-			line = strings.Repeat("─", cols-w) + tail
-		}
-	}
 	if s.color {
-		line = paint(styleDim, line)
+		line = paint(styleRule, line)
+	}
+	if s.note != "" {
+		tail := " " + s.note + " "
+		if w := stringWidth(tail) + 2; w < cols-4 {
+			dashes := strings.Repeat("─", cols-w)
+			line = dashes + tail + "──"
+			if s.color {
+				line = paint(styleRule, dashes) + paint(styleDim, tail) + paint(styleRule, "──")
+			}
+		}
 	}
 	return "\x1b[K" + line
 }
@@ -294,11 +298,12 @@ func (s *Screen) render() string {
 		}
 		shown = append([]rune{'…'}, shown[i:]...)
 	}
-	if len(shown) == 0 && s.composer() && s.hint != "" && avail > 1 {
-		hint := clipEnd(s.hint, avail)
+	// The hint sits two spaces past the cursor cell, as in the design.
+	if len(shown) == 0 && s.composer() && s.hint != "" && avail > 4 {
+		hint := "   " + clipEnd(s.hint, avail-3)
 		h := hint
 		if s.color {
-			h = paint(styleDim, hint)
+			h = "   " + paint(styleDim, hint[3:])
 		}
 		// Park the cursor back at the start of the (empty) input.
 		return fmt.Sprintf("\r\x1b[K%s%s\x1b[%dD", head, h, stringWidth(hint))

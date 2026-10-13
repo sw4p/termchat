@@ -86,7 +86,7 @@ func TestScreenStatusRuleAndGutterPrompt(t *testing.T) {
 
 	s.SetStatus("to bob", "")
 	rule := strings.Repeat("─", 39)
-	want := "\r\x1b[K\x1b[K" + rule + "\r\n" + "\r\x1b[K" + "           you › to bob\x1b[6D"
+	want := "\r\x1b[K\x1b[K" + rule + "\r\n" + "\r\x1b[K" + "           you ›    to bob\x1b[9D"
 	if got := buf.String(); got != want {
 		t.Errorf("first SetStatus wrote %q\nwant %q", got, want)
 	}
@@ -94,7 +94,7 @@ func TestScreenStatusRuleAndGutterPrompt(t *testing.T) {
 	// Later output replaces the rule: up a row, print, then rule and prompt.
 	buf.Reset()
 	s.Message("bob", false, "hi")
-	if got := buf.String(); !strings.HasPrefix(got, "\r\x1b[1A\r\x1b[K") || !strings.Contains(got, rule) || !strings.Contains(got, "you › to bob") {
+	if got := buf.String(); !strings.HasPrefix(got, "\r\x1b[1A\r\x1b[K") || !strings.Contains(got, rule) || !strings.Contains(got, "you ›    to bob") {
 		t.Errorf("Message with a rule wrote %q", got)
 	}
 

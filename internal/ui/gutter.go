@@ -17,12 +17,14 @@ const (
 )
 
 // ANSI styles. Only used when colour is on. The colours are the design's
-// (peer blue #5fb3e6, you orange #e8a45c, warning #e5c07b), as the nearest
-// 256-colour entries, or exact RGB where the terminal supports it.
+// (peer blue #5fb3e6, you orange #e8a45c, warning #e5c07b, dim #8b93a1,
+// rules #2a2f38), as the nearest 256-colour entries, or exact RGB where the
+// terminal supports it.
 var (
 	styleReset = "\x1b[0m"
 	styleBold  = "\x1b[1m"
-	styleDim   = "\x1b[2m"
+	styleDim   = "\x1b[38;5;246m"
+	styleRule  = "\x1b[38;5;236m"
 	styleItal  = "\x1b[3m"
 	stylePeer  = "\x1b[38;5;74m"
 	styleYou   = "\x1b[38;5;215m"
@@ -34,6 +36,8 @@ func UseTrueColor() {
 	stylePeer = "\x1b[38;2;95;179;230m"
 	styleYou = "\x1b[38;2;232;164;92m"
 	styleWarn = "\x1b[38;2;229;192;123m"
+	styleDim = "\x1b[38;2;139;147;161m"
+	styleRule = "\x1b[38;2;42;47;56m"
 }
 
 // gutterLines lays out one row per wrapped piece of text; "\n" in text starts
