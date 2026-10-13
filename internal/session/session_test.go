@@ -145,6 +145,8 @@ func (o *testOut) Message(name string, self bool, text string) {
 	o.Println(name + ": " + text)
 }
 
+func (o *testOut) SetStatus(string) {}
+
 func (o *testOut) SetPrompt(p string) {
 	o.mu.Lock()
 	defer o.mu.Unlock()

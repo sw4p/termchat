@@ -63,6 +63,8 @@ type Output interface {
 	// Message prints a chat line from name; self is true for our own.
 	Message(name string, self bool, text string)
 	SetPrompt(p string)
+	// SetStatus sets the status line above the prompt, like "idle".
+	SetStatus(status string)
 	Bell()
 }
 
@@ -288,27 +290,31 @@ func (m *Manager) setState(st State) {
 		m.adv.SetState(discovery.Busy)
 	}
 	m.out.SetPrompt(m.prompt())
+	m.out.SetStatus(m.status())
 	select {
 	case m.wake <- struct{}{}:
 	default:
 	}
 }
 
-func (m *Manager) prompt() string {
+func (m *Manager) prompt() string { return "[" + m.status() + "] > " }
+
+// status says what the user is doing: looking, chatting, and so on.
+func (m *Manager) status() string {
 	switch m.state {
 	case Seeking:
-		return "[looking…] > "
+		return "looking…"
 	case Chatting:
 		if m.current != nil && m.typing {
-			return fmt.Sprintf("[%s is typing…] > ", m.current.partner)
+			return fmt.Sprintf("%s is typing…", m.current.partner)
 		}
 		if m.current != nil {
-			return fmt.Sprintf("[chatting with %s] > ", m.current.partner)
+			return fmt.Sprintf("chatting with %s", m.current.partner)
 		}
 	case Invisible:
-		return "[invisible] > "
+		return "invisible"
 	}
-	return "[idle] > "
+	return "idle"
 }
 
 // begin starts a chat with partner over sc. m.mu must be held.
@@ -349,6 +355,7 @@ func (m *Manager) onTyping(c *conversation, on bool) {
 	}
 	m.typing = on
 	m.out.SetPrompt(m.prompt())
+	m.out.SetStatus(m.status())
 }
 
 // Typing tells the partner we're typing. Call it on every keystroke: it
