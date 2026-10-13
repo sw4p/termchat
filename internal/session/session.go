@@ -63,8 +63,11 @@ type Output interface {
 	// Message prints a chat line from name; self is true for our own.
 	Message(name string, self bool, text string)
 	SetPrompt(p string)
-	// SetStatus sets the status line above the prompt, like "idle".
-	SetStatus(status string)
+	// Banner prints a rule with "text name" set in it, for a new chat.
+	Banner(text, name string)
+	// SetStatus sets the dim hint after the empty prompt and a note on the
+	// rule above it (for example, that the partner is typing).
+	SetStatus(hint, note string)
 	Bell()
 }
 
@@ -290,7 +293,7 @@ func (m *Manager) setState(st State) {
 		m.adv.SetState(discovery.Busy)
 	}
 	m.out.SetPrompt(m.prompt())
-	m.out.SetStatus(m.status())
+	m.out.SetStatus(m.hint())
 	select {
 	case m.wake <- struct{}{}:
 	default:
@@ -298,6 +301,25 @@ func (m *Manager) setState(st State) {
 }
 
 func (m *Manager) prompt() string { return "[" + m.status() + "] > " }
+
+// hint is what the prompt area shows besides the prompt: a dim hint for the
+// empty input line, and a note for the rule above it.
+func (m *Manager) hint() (hint, note string) {
+	switch m.state {
+	case Seeking:
+		return "looking for someone…", ""
+	case Chatting:
+		if m.current != nil {
+			if m.typing {
+				note = m.current.partner + " is typing…"
+			}
+			return "to " + m.current.partner, note
+		}
+	case Invisible:
+		return "invisible · /visible to come back", ""
+	}
+	return "/find to look for someone", ""
+}
 
 // status says what the user is doing: looking, chatting, and so on.
 func (m *Manager) status() string {
@@ -355,7 +377,7 @@ func (m *Manager) onTyping(c *conversation, on bool) {
 	}
 	m.typing = on
 	m.out.SetPrompt(m.prompt())
-	m.out.SetStatus(m.status())
+	m.out.SetStatus(m.hint())
 }
 
 // Typing tells the partner we're typing. Call it on every keystroke: it

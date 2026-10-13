@@ -145,7 +145,12 @@ func (o *testOut) Message(name string, self bool, text string) {
 	o.Println(name + ": " + text)
 }
 
-func (o *testOut) SetStatus(string) {}
+func (o *testOut) SetStatus(hint, note string) {}
+
+// Banner records the plain form of the new-chat rule.
+func (o *testOut) Banner(text, name string) {
+	o.Println("─── " + text + " " + name + " ───")
+}
 
 func (o *testOut) SetPrompt(p string) {
 	o.mu.Lock()

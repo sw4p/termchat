@@ -8,12 +8,14 @@ Chat with a random stranger on your local network, from the terminal.
 - **Text only, one to one.** Skip to someone new with `/next`, or go invisible with `/invisible`.
 
 ```
-hi, quiet-otter. looking for someone on your network… (/help for commands)
-─── new chat with brave-lynx ───
-! Strangers may send links or commands. termchat never asks you to run anything.
-brave-lynx: hey! anyone else stuck in this meeting?
-you: haha yes
-[brave-lynx is typing…] >
+     termchat │ hi, quiet-otter. looking for someone on your network… (/help)
+─────────── new chat with brave-lynx ───────────
+            ! │ strangers may send links or commands.
+              │ termchat never asks you to run anything.
+   brave-lynx │ hey! anyone else stuck in this meeting?
+          you │ haha yes
+──────────────────────────── brave-lynx is typing… ──
+          you › to brave-lynx
 ```
 
 ## Install
