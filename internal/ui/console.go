@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -41,9 +42,15 @@ func Open(limit int) (*Console, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Start on a clean screen: home the cursor and clear what's visible.
+	// Start on a clean screen with the cursor on the bottom row, so output
+	// grows upward from the prompt as in a chat window (and terminals that
+	// pin the running command over the top rows don't hide the greeting).
 	// Scrollback is left alone, so the user's earlier output isn't lost.
-	os.Stdout.WriteString("\x1b[H\x1b[2J")
+	rows := 24
+	if _, h, err := term.GetSize(outFd); err == nil && h > 0 {
+		rows = h
+	}
+	fmt.Fprintf(os.Stdout, "\x1b[2J\x1b[%d;1H", rows)
 	width := func() int {
 		w, _, err := term.GetSize(outFd)
 		if err != nil || w <= 0 {
