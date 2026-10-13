@@ -49,6 +49,9 @@ func Open(limit int) (*Console, error) {
 	}
 	c := newRaw(os.Stdin, os.Stdout, width, limit)
 	c.screen.SetColor(os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb")
+	if ct := os.Getenv("COLORTERM"); ct == "truecolor" || ct == "24bit" {
+		UseTrueColor()
+	}
 	c.restore = func() { term.Restore(inFd, old) }
 	return c, nil
 }
