@@ -27,8 +27,9 @@ type Console struct {
 }
 
 // Open starts a Console on stdin/stdout. When both are terminals it switches
-// stdin to raw mode and runs the line editor. Otherwise (piped input, output
-// redirected to a file) it falls back to plain line-by-line I/O.
+// stdin to raw mode, clears the screen and runs the line editor. Otherwise
+// (piped input, output redirected to a file) it falls back to plain
+// line-by-line I/O.
 //
 // Always call Close, which restores the terminal.
 func Open(limit int) (*Console, error) {
@@ -40,6 +41,9 @@ func Open(limit int) (*Console, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Start on a clean screen: home the cursor and clear what's visible.
+	// Scrollback is left alone, so the user's earlier output isn't lost.
+	os.Stdout.WriteString("\x1b[H\x1b[2J")
 	width := func() int {
 		w, _, err := term.GetSize(outFd)
 		if err != nil || w <= 0 {
